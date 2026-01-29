@@ -2,9 +2,7 @@ import os
 from groq import Groq
 
 
-# =========================================================
-# Groq Client Configuration
-# =========================================================
+
 
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
@@ -13,9 +11,7 @@ client = Groq(
 MODEL_NAME = "llama-3.3-70b-versatile"
 
 
-# =========================================================
-# Core LLM Call (Controlled Output)
-# =========================================================
+
 
 def call_llm(prompt: str, max_tokens: int = 350) -> str | None:
     """
@@ -49,9 +45,7 @@ def call_llm(prompt: str, max_tokens: int = 350) -> str | None:
         return None
 
 
-# =========================================================
-# Fallbacks (Short & Clean)
-# =========================================================
+
 
 def fallback_role_explanation(role: str, matched_skills: list, missing_skills: list) -> str:
     return (
@@ -71,9 +65,6 @@ def fallback_roadmap_explanation(role: str) -> str:
     )
 
 
-# =========================================================
-# AI Explanation Builders (CLEAN & SCANNABLE)
-# =========================================================
 
 def explain_role_fit(role: str, matched_skills: list, missing_skills: list) -> str:
     prompt = f"""
