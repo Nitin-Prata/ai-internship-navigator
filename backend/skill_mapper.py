@@ -1,15 +1,32 @@
-
 import re
-from typing import List, Dict, Set
+from typing import Dict, Set, List
+
+
+SKILL_ALIASES = {
+    "machine learning": {"ml", "machine-learning"},
+    "deep learning": {"dl", "deep-learning"},
+    "natural language processing": {"nlp"},
+    "computer vision": {"cv"},
+    "scikit-learn": {"sklearn", "scikit learn"},
+    "pytorch": {"torch"},
+    "tensorflow": {"tf"},
+    "large language models": {"llm", "llms"},
+}
+
+
+ALIAS_TO_SKILL = {
+    alias: canonical
+    for canonical, aliases in SKILL_ALIASES.items()
+    for alias in aliases
+}
 
 
 
-
-ROLE_SKILLS = {
+ROLE_SKILLS: Dict[str, Set[str]] = {
     "Data Scientist": {
         "python", "pandas", "numpy", "sql", "statistics",
-        "machine learning", "data visualization", "matplotlib",
-        "seaborn", "scikit-learn"
+        "machine learning", "data visualization",
+        "matplotlib", "seaborn", "scikit-learn"
     },
 
     "Machine Learning Engineer": {
@@ -20,14 +37,14 @@ ROLE_SKILLS = {
 
     "AI Engineer": {
         "python", "machine learning", "deep learning",
-        "nlp", "computer vision", "transformers",
-        "llm", "pytorch", "tensorflow"
+        "natural language processing", "computer vision",
+        "large language models", "pytorch",
+        "tensorflow", "transformers"
     },
 
     "Software Engineer": {
         "python", "java", "c++", "data structures",
-        "algorithms", "git", "api", "fastapi",
-        "sql"
+        "algorithms", "git", "api", "fastapi", "sql"
     }
 }
 
@@ -35,64 +52,63 @@ ROLE_SKILLS = {
 
 
 def normalize_text(text: str) -> str:
-    """
-    Lowercase and remove special characters
-    """
     text = text.lower()
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    return text
+    text = re.sub(r"[^a-z0-9\+\s\-]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
 
 
 def extract_skills(text: str) -> Set[str]:
     """
-    Extract skills from resume or skill text
+    Extract skills from resume or skills text using
+    canonical skill names and aliases.
     """
     text = normalize_text(text)
-    found_skills = set()
+    found_skills: Set[str] = set()
 
-    for role, skills in ROLE_SKILLS.items():
+    for skills in ROLE_SKILLS.values():
         for skill in skills:
-            if skill in text:
+            if re.search(rf"\b{re.escape(skill)}\b", text):
                 found_skills.add(skill)
+
+    for alias, canonical in ALIAS_TO_SKILL.items():
+        if re.search(rf"\b{re.escape(alias)}\b", text):
+            found_skills.add(canonical)
 
     return found_skills
 
 
 
-
 def match_roles(user_skills: Set[str]) -> Dict[str, Dict]:
-    """
-    Match user skills with each role and calculate match score
-    """
     role_analysis = {}
 
     for role, required_skills in ROLE_SKILLS.items():
-        matched = user_skills.intersection(required_skills)
+        matched = user_skills & required_skills
         missing = required_skills - matched
 
+        score = 0
+        for skill in matched:
+            score += 1
+
         match_percentage = round(
-            (len(matched) / len(required_skills)) * 100, 2
+            (score / len(required_skills)) * 100, 2
         )
 
         role_analysis[role] = {
             "match_percentage": match_percentage,
-            "matched_skills": sorted(list(matched)),
-            "missing_skills": sorted(list(missing))
+            "matched_skills": sorted(matched),
+            "missing_skills": sorted(missing)
         }
 
     return role_analysis
 
 
-
-
 def analyze_profile(input_text: str) -> Dict:
-    """
-    Main function to analyze resume or skills text
-    """
     user_skills = extract_skills(input_text)
     role_matches = match_roles(user_skills)
 
     return {
-        "extracted_skills": sorted(list(user_skills)),
+        "extracted_skills": sorted(user_skills),
         "role_analysis": role_matches
     }
