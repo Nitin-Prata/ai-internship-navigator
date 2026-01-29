@@ -1,12 +1,12 @@
-from ai_explainer import explain_role_fit, explain_roadmap
+from backend.ai_explainer import explain_role_fit, explain_roadmap
+from backend.skill_mapper import analyze_profile
+from backend.roadmap import build_role_roadmap
 from fastapi import UploadFile, File
 from resume_parser import parse_resume
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Dict
 
-from skill_mapper import analyze_profile
-from roadmap import build_role_roadmap
 
 
 app = FastAPI(
