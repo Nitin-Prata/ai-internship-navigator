@@ -1,72 +1,144 @@
-import requests
 import os
+from groq import Groq
 
 
-HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct"
+# =========================================================
+# Groq Client Configuration
+# =========================================================
 
-HF_HEADERS = {
-    "Authorization": f"Bearer {os.getenv('HF_API_KEY')}"
-}
+client = Groq(
+    api_key=os.getenv("GROQ_API_KEY")
+)
+
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 
-def call_llm(prompt: str, max_tokens: int = 300) -> str:
+# =========================================================
+# Core LLM Call (Controlled Output)
+# =========================================================
+
+def call_llm(prompt: str, max_tokens: int = 350) -> str | None:
     """
-    Call Hugging Face Inference API
+    Calls Groq LLaMA-3 model with controlled verbosity.
     """
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": max_tokens,
-            "temperature": 0.6,
-            "return_full_text": False
-        }
-    }
+    try:
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a senior career mentor. "
+                        "You give clear, structured, concise advice. "
+                        "You avoid long paragraphs and unnecessary storytelling."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.4,
+            max_tokens=max_tokens
+        )
 
-    response = requests.post(
-        HF_API_URL,
-        headers=HF_HEADERS,
-        json=payload,
-        timeout=30
+        return completion.choices[0].message.content.strip()
+
+    except Exception as e:
+        print("GROQ ERROR:", str(e))
+        return None
+
+
+# =========================================================
+# Fallbacks (Short & Clean)
+# =========================================================
+
+def fallback_role_explanation(role: str, matched_skills: list, missing_skills: list) -> str:
+    return (
+        f"**Why {role} fits you**\n\n"
+        f"- You already have strong foundations in {', '.join(matched_skills[:4])}.\n"
+        f"- These skills are commonly used in real internship tasks.\n"
+        f"- Gaps like {', '.join(missing_skills[:3])} are learnable and expected at this stage."
     )
 
-    if response.status_code != 200:
-        return "AI explanation is temporarily unavailable."
 
-    output = response.json()
-
-    if isinstance(output, list) and "generated_text" in output[0]:
-        return output[0]["generated_text"].strip()
-
-    return "AI explanation could not be generated."
-
+def fallback_roadmap_explanation(role: str) -> str:
+    return (
+        f"**How to follow this roadmap**\n\n"
+        f"- Focus on fundamentals first, then practice.\n"
+        f"- Build small projects as you learn.\n"
+        f"- After 30 days, aim to be interview-ready, not perfect."
+    )
 
 
+# =========================================================
+# AI Explanation Builders (CLEAN & SCANNABLE)
+# =========================================================
 
 def explain_role_fit(role: str, matched_skills: list, missing_skills: list) -> str:
     prompt = f"""
-You are a career mentor for students.
+Explain why the role **{role}** fits the student.
 
-Explain in simple, clear English why the role "{role}" is suitable
-based on these matched skills: {matched_skills}.
+Use EXACTLY this structure:
 
-Also gently explain what skills are missing: {missing_skills},
-and why learning them matters.
+Section 1: Strengths (3 bullet points)
+- Mention how existing skills are used in real internships
 
-Keep the explanation practical and encouraging.
+Section 2: Skill Gaps (3 bullet points)
+- Explain why the missing skills matter in day-to-day work
+
+Section 3: Recommendation (2 bullet points)
+- Is this role a good choice right now?
+- What to focus on first?
+
+Rules:
+- No long paragraphs
+- No storytelling
+- Clear, practical language
+
+Student skills:
+{matched_skills}
+
+Missing skills:
+{missing_skills}
 """
-    return call_llm(prompt)
+    result = call_llm(prompt)
+
+    if result:
+        return result
+
+    return fallback_role_explanation(role, matched_skills, missing_skills)
 
 
 def explain_roadmap(role: str, roadmap: dict) -> str:
     prompt = f"""
-You are an AI mentor.
+Explain how to follow a 30-day roadmap for a **{role} internship**.
 
-Explain how a student should follow this 30-day learning roadmap
-to prepare for a {role} internship.
+Use EXACTLY this structure:
 
-Roadmap:
-{roadmap}
+Section 1: First 15 Days (3 bullet points)
+- What to focus on
+- How to study
+- How much practice
 
-Explain step-by-step, in a motivating and realistic tone.
+Section 2: Practice Strategy (3 bullet points)
+- Projects
+- Datasets
+- Real-world simulation
+
+Section 3: Outcome After 30 Days (3 bullet points)
+- Skills
+- Confidence
+- Internship readiness
+
+Rules:
+- Bullet points only
+- No long paragraphs
+- Be realistic and motivating
 """
-    return call_llm(prompt)
+    result = call_llm(prompt)
+
+    if result:
+        return result
+
+    return fallback_roadmap_explanation(role)
