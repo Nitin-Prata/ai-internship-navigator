@@ -35,6 +35,13 @@ The system is designed to feel like guidance from a real mentor, not a checklist
 
 ---
 
+## 🌐 Live Demo
+
+- **Web App:** https://ai-internship-navigator-5q3yqtayw6zjg6myubabb9.streamlit.app/
+- **API Docs:** https://ai-internship-navigator-1.onrender.com/docs
+
+---
+
 ## 🧠 How It Works
 
 ### 1. Resume & Skill Analysis
