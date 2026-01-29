@@ -1,86 +1,70 @@
 import streamlit as st
 import requests
 
-# -----------------------------
-# Config
-# -----------------------------
-
 BACKEND_URL = "http://127.0.0.1:8000"
+
 
 st.set_page_config(
     page_title="AI Internship Navigator",
     layout="centered"
 )
 
-# -----------------------------
-# UI Header
-# -----------------------------
+
 
 st.title("🎓 AI Internship Navigator")
 st.caption("Built with FastAPI, Streamlit, and open-source AI models")
 
 st.write(
     "Upload your resume or paste your skills to discover suitable internship roles, "
-    "identify skill gaps, and get a 30-day personalized learning roadmap."
+    "identify skill gaps, and get a **mentor-style 30-day learning roadmap**."
 )
 
-# -----------------------------
-# Resume Input Section
-# -----------------------------
+
 
 uploaded_file = st.file_uploader(
     "📄 Upload your resume (PDF or DOCX)",
     type=["pdf", "docx"]
 )
 
-input_text = st.text_area(
+resume_text = st.text_area(
     "✍️ Or paste your resume text / skills here:",
     height=200
 )
 
-analyze_button = st.button("🔍 Analyze Profile")
 
-# -----------------------------
-# Analyze Profile
-# -----------------------------
 
-if analyze_button and (uploaded_file or input_text.strip()):
-    with st.spinner("Analyzing your profile..."):
-
-        if uploaded_file:
+if st.button("Analyze Profile"):
+    if not resume_text.strip() and not uploaded_file:
+        st.warning("Please upload a resume or paste your skills.")
+    else:
+        with st.spinner("Analyzing your profile..."):
             response = requests.post(
                 f"{BACKEND_URL}/analyze-resume",
-                files={"file": uploaded_file}
+                files={"file": uploaded_file} if uploaded_file else None,
+                data={"text": resume_text} if resume_text else None
             )
+
+        if response.status_code == 200:
+            analysis = response.json()
+            st.session_state["analysis"] = analysis
+            st.session_state.pop("roadmap", None)
+            st.session_state.pop("explanation", None)
+
+            st.success("Profile analyzed successfully!")
+
+            st.subheader("🧠 Extracted Skills")
+            st.write(analysis["extracted_skills"])
+
+            st.subheader("📊 Role Match Analysis")
+            for role, data in analysis["role_analysis"].items():
+                st.markdown(f"**{role}** — {data['match_percentage']}% match")
+                st.write("Matched skills:", data["matched_skills"])
+                st.write("Missing skills:", data["missing_skills"])
+                st.divider()
         else:
-            response = requests.post(
-                f"{BACKEND_URL}/analyze",
-                json={"text": input_text}
-            )
+            st.error("Failed to analyze profile.")
 
-    if response.status_code == 200:
-        analysis = response.json()
-        st.session_state["analysis"] = analysis
 
-        st.success("✅ Profile analyzed successfully!")
-
-        st.subheader("🧠 Extracted Skills")
-        st.write(analysis["extracted_skills"])
-
-        st.subheader("📊 Role Match Analysis")
-
-        for role, data in analysis["role_analysis"].items():
-            st.markdown(f"### {role} — {data['match_percentage']}% match")
-            st.write("**Matched skills:**", data["matched_skills"])
-            st.write("**Missing skills:**", data["missing_skills"])
-            st.divider()
-
-    else:
-        st.error("❌ Failed to analyze profile.")
-
-# -----------------------------
-# Roadmap Section
-# -----------------------------
 
 if "analysis" in st.session_state:
     st.subheader("🛣️ Generate 30-Day Learning Roadmap")
@@ -90,10 +74,8 @@ if "analysis" in st.session_state:
         list(st.session_state["analysis"]["role_analysis"].keys())
     )
 
-    roadmap_button = st.button("📅 Generate Roadmap")
-
-    if roadmap_button:
-        with st.spinner("Building your roadmap..."):
+    if st.button("Generate Roadmap"):
+        with st.spinner("Creating your personalized roadmap..."):
             response = requests.post(
                 f"{BACKEND_URL}/roadmap",
                 json={
@@ -104,53 +86,51 @@ if "analysis" in st.session_state:
 
         if response.status_code == 200:
             roadmap = response.json()
-            st.success(f"📌 30-Day Roadmap for {selected_role}")
-
-            if "message" in roadmap:
-                st.info(roadmap["message"])
-            else:
-                for week, details in roadmap.items():
-                    st.markdown(f"### {week}")
-                    st.write("**Focus Skills:**", details["focus_skills"])
-
-                    st.write("**Goals:**")
-                    for g in details["goals"]:
-                        st.write("- ", g)
-
-                    st.write("**Practice:**")
-                    for p in details["practice"]:
-                        st.write("- ", p)
+            st.session_state["roadmap"] = roadmap
+            st.session_state["selected_role"] = selected_role
+            st.session_state.pop("explanation", None)
 
         else:
-            st.error("❌ Failed to generate roadmap.")
+            st.error("Failed to generate roadmap.")
 
-# -----------------------------
-# AI Explanation Section
-# -----------------------------
 
-if "analysis" in st.session_state:
+
+if "roadmap" in st.session_state:
+    st.markdown(f"### 📌 30-Day Roadmap for {st.session_state['selected_role']}")
+
+    roadmap = st.session_state["roadmap"]
+
+    if "roadmap_text" in roadmap:
+        st.markdown(roadmap["roadmap_text"])
+    else:
+        st.warning("Roadmap could not be generated.")
+
+
+
+if "roadmap" in st.session_state:
     st.subheader("🤖 AI Mentor Explanation")
 
-    explain_button = st.button("🧠 Explain with AI")
-
-    if explain_button:
-        with st.spinner("AI is explaining your results..."):
-            response = requests.post(
+    if st.button("Explain with AI Mentor 🤖"):
+        with st.spinner("AI mentor is explaining your path..."):
+            explain_response = requests.post(
                 f"{BACKEND_URL}/explain",
                 json={
-                    "role_name": selected_role,
+                    "role_name": st.session_state["selected_role"],
                     "role_analysis": st.session_state["analysis"]["role_analysis"]
                 }
             )
 
-        if response.status_code == 200:
-            explanations = response.json()
-
-            st.markdown("### 🎯 Why this role fits you")
-            st.write(explanations["role_explanation"])
-
-            st.markdown("### 🧭 How to follow this roadmap")
-            st.write(explanations["roadmap_explanation"])
-
+        if explain_response.status_code == 200:
+            st.session_state["explanation"] = explain_response.json()
         else:
-            st.error("❌ AI explanation could not be generated.")
+            st.error("AI explanation could not be generated.")
+
+
+if "explanation" in st.session_state:
+    explanations = st.session_state["explanation"]
+
+    st.markdown("### 🎯 Why this role fits you")
+    st.write(explanations["role_explanation"])
+
+    st.markdown("### 🧭 How to follow this roadmap")
+    st.write(explanations["roadmap_explanation"])
