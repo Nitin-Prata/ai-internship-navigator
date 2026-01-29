@@ -3,3 +3,7 @@ uvicorn
 pydantic
 streamlit
 requests
+pymupdf
+python-docx
+python-multipart
+requests
