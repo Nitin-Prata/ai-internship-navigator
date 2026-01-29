@@ -61,28 +61,39 @@ async def analyze_resume(file: UploadFile = File(...)):
     return result
 
 
+class ExplainRequest(BaseModel):
+    role_name: str
+    role_analysis: dict
+    roadmap: dict | None = None
+
+
+
 @app.post("/explain")
-def explain_results(request: RoadmapRequest):
-    """
-    Generate AI explanation for role fit and roadmap
-    """
+def explain_results(request: ExplainRequest):
     role = request.role_name
+
+    
+    if role not in request.role_analysis:
+        return {
+            "role_explanation": "Please generate the roadmap before requesting AI explanation.",
+            "roadmap_explanation": "AI explanation requires a valid role selection and roadmap."
+        }
+
     role_data = request.role_analysis[role]
 
     role_explanation = explain_role_fit(
-        role=role,
-        matched_skills=role_data["matched_skills"],
-        missing_skills=role_data["missing_skills"]
+        role,
+        role_data.get("matched_skills", []),
+        role_data.get("missing_skills", [])
     )
 
-    roadmap = build_role_roadmap(
-        role_analysis=request.role_analysis,
-        role_name=role
+    roadmap_explanation = explain_roadmap(
+        role,
+        request.roadmap
     )
-
-    roadmap_explanation = explain_roadmap(role, roadmap)
 
     return {
         "role_explanation": role_explanation,
         "roadmap_explanation": roadmap_explanation
     }
+
